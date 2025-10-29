@@ -1,0 +1,67 @@
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Markdown files (excluding important documentation)
+*.md
+!README.md
+!DEVELOPMENT.md
+!GLOSSARY.md
+
+
+
+# Development files
+progress.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test and coverage reports
+coverage/
+*.lcov
+*.profdata
+*.gcda
+*.gcno
+
+# Environment specific
+.env
+.env.local
+.env.*.local
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Icon?
+*.DS_Store
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+dist/
+build/
+
+# Criterion benchmark artifacts
+target/criterion/
+
+# Other common build artifacts
+out/
+bin/
+obj/

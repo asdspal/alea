@@ -1,0 +1,28 @@
+[package]
+name = "entropy-aggregator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+log = { workspace = true }
+env_logger = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+beacon-microchain = { path = "../beacon-microchain" }
+entropy-types = { path = "../types" }
+entropy-worker = { path = "../entropy-worker" }
+clap = { version = "4.0", features = ["derive"] }
+secp256k1 = { version = "0.28", features = ["serde", "global-context", "recovery"] }
+serde_json = "1.0"
+hex = "0.4"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "round_latency"
+harness = false

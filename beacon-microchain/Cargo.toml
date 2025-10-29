@@ -1,0 +1,11 @@
+[package]
+name = "beacon-microchain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+linera-sdk = { version = "0.14.0" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
