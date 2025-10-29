@@ -1,11 +1,9 @@
-# Project Entropy (Alea)
+# Alea
 
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and component responsibilities
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Local setup, build, and test instructions
-- [PROTOCOL.md](PROTOCOL.md) - Detailed message flow and protocol specifications
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Code style, PR process, and contribution guidelines
 - [GLOSSARY.md](GLOSSARY.md) - Terms and definitions
 
