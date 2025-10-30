@@ -521,7 +521,7 @@ impl Aggregator {
 mod tests {
     use super::*;
     use entropy_types::{CommitmentPayload};
-    use ed25519_dalek::{SigningKey, Signature, Signer};
+    use ed25519_dalek::{SigningKey, Signature, Signer, Verifier};
     use rand::rngs::OsRng;
 
     #[tokio::test]

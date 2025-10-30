@@ -3,31 +3,33 @@ use serde::{Deserialize, Serialize};
 
 pub mod mock;
 
+/// Random number type - 32 bytes
+pub type RandomNumber = [u8; 32];
+
+/// Nonce type - 16 bytes
+pub type Nonce = [u8; 16];
+
+/// Attestation report from the TEE
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttestationReport {
+    pub random_number: RandomNumber,
+    pub nonce: Nonce,
+    pub code_measurement: [u8; 32], // SHA256 of enclave code
+    pub timestamp: u64,
+}
+
 /// Trait that abstracts TEE enclave operations for the entropy aggregator
 pub trait TEEEnclave: Send + Sync {
-    /// Generate a cryptographically secure nonce within the TEE
-    fn generate_nonce(&self) -> Result<[u8; 32]>;
-
     /// Aggregate entropy secrets within the TEE and produce an attestation
-    /// Returns the aggregated output and a cryptographic attestation
-    fn aggregate(&self, secrets: &[Vec<u8>]) -> Result<(Vec<u8>, Attestation)>;
+    /// Returns the random number, nonce, and attestation report
+    fn aggregate(&self, seed: Vec<u8>) -> Result<(RandomNumber, Nonce, AttestationReport)>;
 
-    /// Verify an attestation produced by a TEE
-    fn verify_attestation(&self, attestation: &Attestation, data: &[u8]) -> Result<bool>;
+    /// Verify an attestation report produced by a TEE
+    fn verify_attestation(&self, report: &AttestationReport) -> Result<bool>;
 }
 
-/// Represents an attestation from a TEE
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Attestation {
-    /// The attestation report from the TEE
-    pub report: Vec<u8>,
-    /// Public key used to verify the attestation
-    pub public_key: Vec<u8>,
-    /// Signature of the data + report
-    pub signature: Vec<u8>,
-    /// Type of TEE (e.g., "sgx", "sev", "mock")
-    pub tee_type: String,
-}
+// Note: The old Attestation struct has been replaced by AttestationReport
+// which contains the specific fields required for TEE attestation
 
 /// Configuration for TEE operations
 #[derive(Debug, Clone)]
@@ -59,9 +61,16 @@ pub fn create_tee_enclave(config: &TEEConfig) -> Result<Box<dyn TEEEnclave>> {
         println!("Using mock TEE for local development");
         Ok(Box::new(mock::MockTeeEnclave::new()))
     } else {
-        // In a real implementation, this would initialize the actual TEE
-        // For now, we'll default to mock since actual TEE setup is complex
-        println!("Using mock TEE (real TEE not implemented yet)");
-        Ok(Box::new(mock::MockTeeEnclave::new()))
+        #[cfg(feature = "sgx")]
+        {
+            println!("Using SGX TEE");
+            Ok(Box::new(sgx::SgxTeeEnclave::new()?))
+        }
+        #[cfg(not(feature = "sgx"))]
+        {
+            // If SGX feature is not enabled, fall back to mock
+            println!("SGX feature not enabled, using mock TEE");
+            Ok(Box::new(mock::MockTeeEnclave::new()))
+        }
     }
 }

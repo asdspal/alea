@@ -50,13 +50,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Aggregator node initialized with TEE configuration");
     
     // Test TEE functionality
-    let nonce = tee_enclave.generate_nonce()?;
+    // Example of aggregation (with a test seed for now)
+    let seed = b"test_seed_for_main".to_vec();
+    let (random_number, nonce, attestation_report) = tee_enclave.aggregate(seed)?;
+    info!("TEE generated random number: {:?}", &random_number[..8]); // Log first 8 bytes for brevity
     info!("TEE generated nonce: {:?}", &nonce[..8]); // Log first 8 bytes for brevity
-    
-    // Example of aggregation (with empty secrets for now)
-    let secrets = vec![];
-    let (_aggregated, attestation) = tee_enclave.aggregate(&secrets)?;
-    info!("TEE generated attestation of type: {}", attestation.tee_type);
+    info!("TEE generated attestation with code measurement: {:?}", &attestation_report.code_measurement[..8]);
     
     // Create network handler and start listening
     let network_handler = NetworkHandler::new(aggregator.clone());

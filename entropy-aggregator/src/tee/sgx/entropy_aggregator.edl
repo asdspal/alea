@@ -1,0 +1,35 @@
+/*
+ * Enclave Definition Language file for entropy aggregator SGX enclave
+ */
+
+enclave {
+    /* Trusted library functions */
+    from "sgx_tstd.edl" import *;
+    
+    /* ECALLs - functions that can be called from untrusted code */
+    trusted {
+        /* Main aggregation function */
+        public sgx_status_t ecall_aggregate(
+            [in, size(seed_len)] const uint8_t* seed_ptr,
+            in uint32_t seed_len,
+            [out, size(32)] uint8_t* random_number_ptr,
+            [out, size(16)] uint8_t* nonce_ptr,
+            [out, size(32)] uint8_t* code_measurement_ptr,
+            [out] uint64_t* timestamp_ptr
+        );
+        
+        /* Function to get attestation report */
+        public sgx_status_t ecall_get_attestation_report(
+            [in, opt] const sgx_report_data_t* report_data,
+            [in, opt] const sgx_target_info_t* target_info,
+            [out] sgx_report_t* report
+        );
+    };
+
+    /* OCALLs - functions that the enclave can call back to untrusted code */
+    untrusted {
+        /* For logging and debugging purposes */
+        void ocall_print_string([in, string] const char* str);
+        void ocall_log_event([in, string] const char* event);
+    };
+};

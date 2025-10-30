@@ -1,98 +1,110 @@
 use anyhow::Result;
-use rand::RngCore;
 use sha2::{Sha256, Digest};
+use std::collections::HashSet;
+use std::sync::Mutex;
 
-use super::{Attestation, TEEEnclave};
+use super::{AttestationReport, Nonce, RandomNumber, TEEEnclave};
 
 /// Mock TEE enclave that simulates SGX behavior without requiring actual hardware
 pub struct MockTeeEnclave {
-    /// Simulated private key for signing attestations
-    private_key: [u8; 32],
-    /// Simulated public key for verification
-    public_key: [u8; 32],
+    /// Counter to ensure nonce uniqueness
+    nonce_counter: std::sync::atomic::AtomicU64,
+    /// Code measurement - SHA256 of the enclave code (simulated)
+    code_measurement: [u8; 32],
+    /// Track generated reports for verification purposes
+    generated_reports: Mutex<HashSet<String>>,
 }
 
 impl MockTeeEnclave {
     pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut private_key = [0u8; 32];
-        let mut public_key = [0u8; 32];
-        
-        rng.fill_bytes(&mut private_key);
-        // In a real system, public key would be derived from private key
-        // For the mock, we'll just hash the private key to get a deterministic public key
-        let mut hasher = Sha256::new();
-        hasher.update(&private_key);
-        public_key.copy_from_slice(&hasher.finalize());
+        // Simulate code measurement - hash of the enclave code
+        // Using a fixed value for deterministic behavior
+        let code_measurement = Sha256::digest(b"alea_entropy_aggregator_tee_code").into();
 
         Self {
-            private_key,
-            public_key,
+            nonce_counter: std::sync::atomic::AtomicU64::new(0),
+            code_measurement,
+            generated_reports: Mutex::new(HashSet::new()),
         }
     }
 
-    /// Deterministically generate attestation report for given data
-    fn generate_attestation_report(&self, data: &[u8]) -> Vec<u8> {
-        let mut hasher = Sha256::new();
-        hasher.update(b"mock_attestation_report");
-        hasher.update(data);
-        hasher.update(&self.public_key);
-        hasher.finalize().to_vec()
-    }
-
-    /// Simulate signing with the private key (in reality this would be inside the TEE)
-    fn sign_data(&self, data: &[u8]) -> Vec<u8> {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        hasher.update(&self.private_key);
-        hasher.finalize().to_vec()
+    /// Generate a unique nonce using counter
+    fn generate_nonce(&self) -> Nonce {
+        let counter = self.nonce_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let mut nonce = [0u8; 16];
+        // Use the counter value to fill the nonce (first 8 bytes from counter, rest zeros)
+        let counter_bytes = counter.to_le_bytes();
+        nonce[0..8].copy_from_slice(&counter_bytes);
+        nonce
     }
 }
 
 impl TEEEnclave for MockTeeEnclave {
-    fn generate_nonce(&self) -> Result<[u8; 32]> {
-        let mut rng = rand::thread_rng();
-        let mut nonce = [0u8; 32];
-        rng.fill_bytes(&mut nonce);
-        Ok(nonce)
-    }
+    fn aggregate(&self, seed: Vec<u8>) -> Result<(RandomNumber, Nonce, AttestationReport)> {
+        // Compute SHA256 of the seed to generate the random number
+        let mut hasher = Sha256::new();
+        hasher.update(&seed);
+        let random_number: RandomNumber = hasher.finalize().into();
 
-    fn aggregate(&self, secrets: &[Vec<u8>]) -> Result<(Vec<u8>, Attestation)> {
-        // Aggregate secrets using XOR (in a real implementation, this would be more sophisticated)
-        let mut aggregated = vec![0u8; 32];
-        
-        for secret in secrets {
-            for (i, byte) in secret.iter().enumerate() {
-                if i < aggregated.len() {
-                    aggregated[i] ^= byte;
-                }
-            }
-        }
+        // Generate a unique nonce
+        let nonce = self.generate_nonce();
 
-        // Create a deterministic attestation based on the aggregated data
-        let report = self.generate_attestation_report(&aggregated);
-        let signature = self.sign_data(&aggregated);
-
-        let attestation = Attestation {
-            report,
-            public_key: self.public_key.to_vec(),
-            signature,
-            tee_type: "mock".to_string(),
+        // Create attestation report
+        let attestation_report = AttestationReport {
+            random_number,
+            nonce,
+            code_measurement: self.code_measurement,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         };
 
-        Ok((aggregated, attestation))
+        // Store the report for future verification
+        // Create a unique identifier for this report
+        let report_id = format!(
+            "{}-{}-{}-{}",
+            hex::encode(&attestation_report.random_number),
+            hex::encode(&attestation_report.nonce),
+            hex::encode(&attestation_report.code_measurement),
+            attestation_report.timestamp
+        );
+        
+        if let Ok(mut generated_reports) = self.generated_reports.lock() {
+            generated_reports.insert(report_id);
+        }
+
+        Ok((random_number, nonce, attestation_report))
     }
 
-    fn verify_attestation(&self, attestation: &Attestation, data: &[u8]) -> Result<bool> {
-        // Verify that the attestation matches the data
-        let expected_report = self.generate_attestation_report(data);
-        let expected_signature = self.sign_data(data);
+    fn verify_attestation(&self, report: &AttestationReport) -> Result<bool> {
+        // For a mock TEE, verify that this report was actually generated by this instance
+        let report_id = format!(
+            "{}-{}-{}-{}",
+            hex::encode(&report.random_number),
+            hex::encode(&report.nonce),
+            hex::encode(&report.code_measurement),
+            report.timestamp
+        );
+        
+        let is_known_report = if let Ok(generated_reports) = self.generated_reports.lock() {
+            generated_reports.contains(&report_id)
+        } else {
+            false // If we can't access the lock, assume it's not valid
+        };
+        
+        // Also verify basic properties
+        let code_measurement_valid = report.code_measurement == self.code_measurement;
+        let random_number_valid = report.random_number.len() == 32;
+        let nonce_valid = report.nonce.len() == 16;
+        
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let timestamp_valid = report.timestamp <= current_time + 60; // Allow 1 minute tolerance
 
-        let report_matches = attestation.report == expected_report;
-        let signature_matches = attestation.signature == expected_signature;
-        let public_key_matches = attestation.public_key == self.public_key.to_vec();
-
-        Ok(report_matches && signature_matches && public_key_matches)
+        Ok(is_known_report && code_measurement_valid && random_number_valid && nonce_valid && timestamp_valid)
     }
 }
 
@@ -101,55 +113,69 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mock_tee_nonce_generation() {
+    fn test_deterministic_aggregation() {
         let tee = MockTeeEnclave::new();
-        let nonce1 = tee.generate_nonce().unwrap();
-        let nonce2 = tee.generate_nonce().unwrap();
         
-        // Nonces should be different (with high probability)
+        // Same seed should produce same result
+        let seed = b"test_seed".to_vec();
+        let (random1, nonce1, report1) = tee.aggregate(seed.clone()).unwrap();
+        let (random2, nonce2, report2) = tee.aggregate(seed).unwrap();
+        
+        // The random numbers should be the same for the same seed
+        assert_eq!(random1, random2);
+        
+        // The nonces should be different (counter-based)
         assert_ne!(nonce1, nonce2);
         
-        // Nonces should be 32 bytes
-        assert_eq!(nonce1.len(), 32);
-        assert_eq!(nonce2.len(), 32);
+        // The code measurements should be the same
+        assert_eq!(report1.code_measurement, report2.code_measurement);
     }
 
     #[test]
-    fn test_mock_tee_aggregate() {
+    fn test_nonce_uniqueness() {
         let tee = MockTeeEnclave::new();
         
-        let secrets = vec![
-            vec![1, 2, 3, 4],
-            vec![5, 6, 7, 8],
-            vec![9, 10, 11, 12],
-        ];
-        
-        let (aggregated, attestation) = tee.aggregate(&secrets).unwrap();
-        
-        // Check that we got a result
-        assert!(!aggregated.is_empty());
-        
-        // Check that we got an attestation
-        assert!(!attestation.report.is_empty());
-        assert!(!attestation.public_key.is_empty());
-        assert!(!attestation.signature.is_empty());
-        assert_eq!(attestation.tee_type, "mock");
+        // Generate multiple nonces and ensure they are unique
+        let mut nonces = std::collections::HashSet::new();
+        for i in 0..100 {
+            let (_random, nonce, _report) = tee.aggregate(format!("seed_{}", i).into_bytes()).unwrap();
+            assert!(nonces.insert(nonce)); // insert returns false if already present
+        }
     }
 
     #[test]
-    fn test_mock_tee_attestation_verification() {
+    fn test_attestation_verification() {
         let tee = MockTeeEnclave::new();
         
-        let secrets = vec![vec![1, 2, 3, 4], vec![5, 6, 7, 8]];
-        let (aggregated, attestation) = tee.aggregate(&secrets).unwrap();
+        let seed = b"verification_test".to_vec();
+        let (_random, _nonce, report) = tee.aggregate(seed).unwrap();
         
-        // Verify the attestation
-        let is_valid = tee.verify_attestation(&attestation, &aggregated).unwrap();
+        // Valid attestation should pass verification
+        let is_valid = tee.verify_attestation(&report).unwrap();
         assert!(is_valid);
         
-        // Verify with wrong data should fail
-        let wrong_data = vec![0u8; 32];
-        let is_valid_wrong = tee.verify_attestation(&attestation, &wrong_data).unwrap();
-        assert!(!is_valid_wrong);
+        // Tampered attestation should fail
+        let tampered_report = AttestationReport {
+            random_number: [0u8; 32], // Wrong random number
+            nonce: report.nonce,
+            code_measurement: report.code_measurement,
+            timestamp: report.timestamp,
+        };
+        let is_valid_tampered = tee.verify_attestation(&tampered_report).unwrap();
+        assert!(!is_valid_tampered);
+    }
+
+    #[test]
+    fn test_different_seeds_produce_different_outputs() {
+        let tee = MockTeeEnclave::new();
+        
+        let seed1 = b"seed_one".to_vec();
+        let seed2 = b"seed_two".to_vec();
+        
+        let (random1, _nonce1, _report1) = tee.aggregate(seed1).unwrap();
+        let (random2, _nonce2, _report2) = tee.aggregate(seed2).unwrap();
+        
+        // Different seeds should produce different random numbers
+        assert_ne!(random1, random2);
     }
 }
