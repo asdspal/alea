@@ -45,6 +45,11 @@ impl AggregatorState {
         matches!(self, AggregatorState::CollectingReveals { .. })
     }
 
+    /// Check if the current state is Publishing
+    pub fn is_publishing(&self) -> bool {
+        matches!(self, AggregatorState::Publishing { .. })
+    }
+
     /// Get the round ID if the state has one
     pub fn get_round_id(&self) -> Option<u64> {
         match self {

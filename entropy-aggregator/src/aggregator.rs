@@ -9,6 +9,7 @@ use log::{info, warn, debug, error, trace};
 
 use crate::state_machine::AggregatorState;
 use crate::error::{AggregatorError, IntoAggregatorError};
+use crate::linera_client::{LineraClient, LineraConfig};
 use anyhow::Result;
 
 #[derive(Debug)]
@@ -39,6 +40,9 @@ pub struct Aggregator {
     pub commitments: Arc<Mutex<HashMap<NodeId, (CommitmentPayload, Vec<u8>)>>>, // (payload, public_key)
     pub reveals: Arc<Mutex<HashMap<NodeId, Vec<u8>>>>, // (node_id, reveal_data)
     pub tx: broadcast::Sender<String>, // Channel for notifications
+    pub linera_client: Option<Arc<Mutex<LineraClient>>>,
+    pub last_submission_block: Arc<Mutex<Option<u64>>>,
+    pub submissions_count: Arc<Mutex<u64>>,
 }
 
 impl Aggregator {
@@ -53,7 +57,25 @@ impl Aggregator {
             commitments: Arc::new(Mutex::new(HashMap::new())),
             reveals: Arc::new(Mutex::new(HashMap::new())),
             tx,
+            linera_client: None,
+            last_submission_block: Arc::new(Mutex::new(None)),
+            submissions_count: Arc::new(Mutex::new(0)),
         })
+    }
+
+    /// Initialize the Linera client with the given configuration
+    pub fn initialize_linera_client(&mut self, linera_config: LineraConfig) -> Result<()> {
+        let client = LineraClient::new(linera_config)?;
+        self.linera_client = Some(Arc::new(Mutex::new(client)));
+        info!("Linera client initialized successfully");
+        Ok(())
+    }
+
+    /// Initialize the Linera client with mock configuration for testing
+    pub fn initialize_mock_linera_client(&mut self, linera_config: LineraConfig) {
+        let client = LineraClient::new_mock(linera_config);
+        self.linera_client = Some(Arc::new(Mutex::new(client)));
+        info!("Mock Linera client initialized successfully");
     }
 
     /// Start a new round of entropy generation
@@ -287,6 +309,9 @@ impl Aggregator {
 
         info!("Transitioned to aggregation phase for round: {}", round_id);
         
+        // Complete the aggregation by aggregating reveals and submitting to beacon
+        self.complete_aggregation_phase(round_id).await?;
+        
         Ok(())
     }
 
@@ -357,6 +382,12 @@ impl Aggregator {
     pub fn get_state(&self) -> AggregatorState {
         let state_guard = self.state.lock().unwrap();
         state_guard.clone()
+    }
+    
+    /// Check if the aggregator is in the publishing state
+    pub fn is_publishing(&self) -> bool {
+        let state_guard = self.state.lock().unwrap();
+        state_guard.is_publishing()
     }
 
     /// Get the current round ID
@@ -457,11 +488,9 @@ impl Aggregator {
                 AggregatorState::Aggregating { round_id } => {
                     info!("Aggregating entropy for round {}", round_id);
                     // In a real implementation, we would perform TEE aggregation here
-                    // For now, we'll just transition to publishing
-                    {
-                        let mut state_guard = self.state.lock().unwrap();
-                        *state_guard = AggregatorState::Publishing { round_id };
-                    }
+                    // The aggregation and submission is handled by complete_aggregation_phase
+                    // which is called during the transition, so we just wait briefly here
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
                 AggregatorState::Publishing { round_id } => {
                     info!("Publishing result for round {}", round_id);
@@ -511,6 +540,110 @@ impl Aggregator {
             }
             
             tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        
+        Ok(())
+    }
+
+    /// Aggregate reveals to generate the final entropy for the round
+    pub fn aggregate_reveals(&self, round_id: u64) -> Result<[u8; 32]> {
+        let reveals_guard = self.reveals.lock().unwrap();
+        
+        if reveals_guard.is_empty() {
+            return Err(anyhow::anyhow!("No reveals available for aggregation"));
+        }
+
+        // Combine all reveals to generate the final entropy
+        // In a real implementation, this would involve TEE-protected aggregation
+        // For now, we'll use a simple XOR and hash approach
+        let mut combined_entropy = [0u8; 32];
+        
+        for (node_id, reveal_data) in reveals_guard.iter() {
+            if reveal_data.len() != 32 {
+                warn!("Invalid reveal data length from node {}: {}", node_id, reveal_data.len());
+                continue;
+            }
+            
+            for i in 0..32 {
+                combined_entropy[i] ^= reveal_data[i];
+            }
+        }
+
+        // Hash the combined result to ensure uniform distribution
+        let mut hasher = Sha256::new();
+        hasher.update(&combined_entropy);
+        hasher.update(round_id.to_le_bytes()); // Include round_id for uniqueness
+        let final_entropy: [u8; 32] = hasher.finalize().into();
+
+        info!("Aggregated entropy for round {}: {}", round_id, hex::encode(&final_entropy));
+        Ok(final_entropy)
+    }
+
+    /// Submit the aggregated randomness to the beacon microchain
+    pub async fn submit_randomness_to_beacon(&self, round_id: u64, entropy: [u8; 32], attestation: Vec<u8>) -> Result<String> {
+        info!("Preparing to submit randomness for round {} to beacon microchain", round_id);
+
+        // Check if Linera client is initialized and get the provider Arc
+        let provider_arc = match &self.linera_client {
+            Some(client_mutex) => {
+                let client = client_mutex.lock().unwrap();
+                client.get_provider().clone() // Get the Arc of the provider using the getter
+            },
+            None => {
+                return Err(anyhow::anyhow!("Linera client not initialized"));
+            }
+        };
+
+        // Create the RandomnessEvent
+        use beacon_microchain::RandomnessEvent;
+        let randomness_event = RandomnessEvent {
+            round_id,
+            random_number: entropy,
+            nonce: [0u8; 16], // In a real implementation, this would be a proper nonce
+            attestation,
+        };
+
+        // Submit with confirmation using the provider Arc directly
+        let tx_hash = provider_arc.submit_randomness_with_confirmation(randomness_event).await?;
+        
+        // Update submission tracking
+        {
+            let mut count_guard = self.submissions_count.lock().unwrap();
+            *count_guard += 1;
+            
+            let mut block_guard = self.last_submission_block.lock().unwrap();
+            // In a real system, this would be the actual block number from confirmation
+            *block_guard = Some(*count_guard);
+        }
+
+        info!("Randomness submission completed for round {}, tx_hash: {}", round_id, tx_hash);
+        
+        // Emit event for Workers/SDK to consume
+        let _ = self.tx.send(format!("RANDOMNESS_SUBMITTED_{}_{}", round_id, tx_hash));
+        
+        Ok(tx_hash)
+    }
+
+    /// Complete the aggregation phase by aggregating reveals and submitting to beacon
+    pub async fn complete_aggregation_phase(&self, round_id: u64) -> Result<()> {
+        info!("Completing aggregation phase for round {}", round_id);
+        
+        // Aggregate the reveals to get the final entropy
+        let entropy = self.aggregate_reveals(round_id)?;
+        
+        // In a real implementation, we would get the attestation from the TEE
+        // For now, we'll use a mock attestation
+        let attestation = vec![0u8; 0]; // Empty attestation for mock
+        
+        // Submit to the beacon microchain
+        let tx_hash = self.submit_randomness_to_beacon(round_id, entropy, attestation).await?;
+        
+        info!("Aggregation and submission completed for round {}, tx_hash: {}", round_id, tx_hash);
+        
+        // Update state to publishing
+        {
+            let mut state_guard = self.state.lock().unwrap();
+            *state_guard = AggregatorState::Publishing { round_id };
         }
         
         Ok(())

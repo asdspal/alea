@@ -16,7 +16,7 @@ export interface RevealPayload {
 
 export interface StartCommitmentMsg {
   roundId: number;
- committee: string[]; // NodeId[] where NodeId is string
+  committee: string[]; // NodeId[] where NodeId is string
 }
 
 export interface StartRevealMsg {
@@ -32,7 +32,7 @@ export interface AttestationReport {
 
 export interface CommitmentMsg {
   roundId: number;
- payload: CommitmentPayload;
+  payload: CommitmentPayload;
   nodeId: string; // NodeId
   timestamp: number;
 }
@@ -45,10 +45,10 @@ export interface RevealMsg {
 }
 
 export interface EntropyRequest {
-  requestId: string;
+ requestId: string;
   clientId: string;
   timestamp: number;
- nonce: string; // hex string representing [u8; 32]
+  nonce: string; // hex string representing [u8; 32]
 }
 
 export interface EntropyResponse {
@@ -56,11 +56,11 @@ export interface EntropyResponse {
   roundId: number;
   entropy: string; // hex string representing [u8; 32]
   attestation: AttestationReport;
- timestamp: number;
+  timestamp: number;
 }
 
 export interface HeartbeatMsg {
-  nodeId: string; // NodeId
+ nodeId: string; // NodeId
   timestamp: number;
   status: string;
 }
@@ -78,16 +78,33 @@ export interface RoundCompletionMsg {
   timestamp: number;
 }
 
-// Existing types
+// Randomness result type
 export interface RandomnessResult {
   roundId: number;
- randomNumber: string; // hex
+  randomNumber: string; // hex
   nonce: string; // hex
- attestation: string; // hex
+  attestation: string; // hex
 }
 
+// Client interface
 export interface EntropyClient {
   requestRandomness(callback: (result: RandomnessResult) => void): Promise<string>;
+}
+
+// Beacon operation types
+export interface BeaconOperation {
+  type: string;
+  data: any;
+}
+
+export interface BeaconQuery {
+  type: string;
+  data: any;
+}
+
+export interface BeaconEvent {
+  type: string;
+  data: any;
 }
 
 // Protocol version constant

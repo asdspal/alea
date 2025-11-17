@@ -1,6 +1,19 @@
 # @alea/entropy-client-sdk
 
-TypeScript client SDK for Project Entropy - a decentralized randomness beacon system.
+TypeScript client SDK for Project Entropy - Secure Randomness Generation for Decentralized Applications
+
+## Overview
+
+The Alea Entropy Client SDK provides a secure, verifiable randomness generation service for decentralized applications. It leverages Trusted Execution Environments (TEEs) and secure multi-party protocols to generate unpredictable, bias-resistant randomness suitable for blockchain applications, gaming, lotteries, and other use cases requiring high-integrity random values.
+
+## Features
+
+- **Secure Randomness**: Unpredictable, bias-resistant randomness generated through TEE-verified processes
+- **Verifiable**: All randomness comes with cryptographic proofs and attestation reports
+- **Easy Integration**: Simple API for requesting randomness from dApps
+- **TypeScript Support**: Full type safety with comprehensive type definitions
+- **Event-Driven**: Real-time updates when randomness is generated
+- **Cross-Platform**: Works in Node.js and modern browsers
 
 ## Installation
 
@@ -8,80 +21,123 @@ TypeScript client SDK for Project Entropy - a decentralized randomness beacon sy
 npm install @alea/entropy-client-sdk
 ```
 
-## Usage
+## Quick Start
 
 ```typescript
-import EntropyClientImpl from '@alea/entropy-client-sdk';
+import { EntropyClient } from '@alea/entropy-client-sdk';
 
-// Initialize the client with beacon address and provider
-const client = new EntropyClientImpl('beacon-contract-address', provider);
+// Initialize the client with your beacon address
+const client = new EntropyClient('your-beacon-address');
 
 // Request randomness
 const requestId = await client.requestRandomness((result) => {
-  console.log('Randomness result:', result);
-  console.log('Round ID:', result.roundId);
-  console.log('Random number:', result.randomNumber);
-  console.log('Nonce:', result.nonce);
+  console.log('Randomness received:', result.randomNumber);
   console.log('Attestation:', result.attestation);
 });
 
 console.log('Request ID:', requestId);
 ```
 
-## API
+## API Reference
 
-### `EntropyClientImpl`
+### `EntropyClient`
+
+The main class for interacting with the Alea Entropy service.
 
 #### Constructor
+
 ```typescript
-new EntropyClientImpl(beaconAddress: string, provider: any)
+new EntropyClient(beaconAddress: string, options?: ClientOptions)
 ```
 
-- `beaconAddress`: Address of the entropy beacon contract
-- `provider`: Blockchain provider instance
+- `beaconAddress`: The address of the entropy beacon microchain
+- `options`: Optional configuration for the client
 
 #### Methods
 
-##### `requestRandomness`
+##### `requestRandomness(callback: (result: RandomnessResult) => void): Promise<string>`
+
+Requests randomness from the Alea Entropy network.
+
+- Returns: A promise that resolves to a request ID
+- The callback is called when randomness is available
+
+##### `queryRandomness(roundId: number): Promise<RandomnessResult | null>`
+
+Queries a specific round of randomness by its ID.
+
+## Examples
+
+### Basic Usage
 
 ```typescript
-async requestRandomness(callback: (result: RandomnessResult) => void): Promise<string>
+import { EntropyClient } from '@alea/entropy-client-sdk';
+
+async function getRandomness() {
+  const client = new EntropyClient('your-beacon-address');
+  
+  try {
+    const requestId = await client.requestRandomness((result) => {
+      console.log(`Randomness for round ${result.roundId}:`, result.randomNumber);
+      console.log('Attestation proof:', result.attestation);
+    });
+    
+    console.log('Requested randomness with ID:', requestId);
+  } catch (error) {
+    console.error('Error requesting randomness:', error);
+  }
+}
+
+getRandomness();
 ```
 
-Requests randomness from the entropy beacon.
-
-- `callback`: Function called when randomness is available
-- Returns: A request ID string
-
-### Types
-
-#### `RandomnessResult`
+### Advanced Usage with Error Handling
 
 ```typescript
-{
-  roundId: number;      // The round ID for this randomness
-  randomNumber: string; // The random number in hex format
-  nonce: string;        // The nonce in hex format
-  attestation: string;  // The attestation in hex format
+import { EntropyClient } from '@alea/entropy-client-sdk';
+
+async function robustRandomnessRequest() {
+  const client = new EntropyClient('your-beacon-address');
+  
+  try {
+    const requestId = await client.requestRandomness(
+      (result) => {
+        // Handle successful randomness result
+        console.log('Randomness result:', result);
+      },
+      (error) => {
+        // Handle errors in callback execution
+        console.error('Error in randomness callback:', error);
+      }
+    );
+    
+    console.log('Request submitted with ID:', requestId);
+  } catch (error) {
+    console.error('Failed to request randomness:', error);
+  }
 }
+
+robustRandomnessRequest();
 ```
 
 ## Development
 
+### Building
+
 ```bash
-# Install dependencies
-npm install
-
-# Build the SDK
 npm run build
-
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
 ```
+
+### Testing
+
+```bash
+npm test
+```
+
+### Contributing
+
+We welcome contributions to the Alea Entropy Client SDK. Please see our [CONTRIBUTING.md](../../CONTRIBUTING.md) for more details.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](./LICENSE) file for details.

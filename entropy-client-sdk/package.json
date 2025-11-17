@@ -1,31 +1,59 @@
 {
   "name": "@alea/entropy-client-sdk",
   "version": "0.1.0",
-  "description": "TypeScript client SDK for Project Entropy",
+  "description": "TypeScript client SDK for Project Entropy - Secure Randomness Generation for Decentralized Applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "build:dev": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "publish": "npm publish --access public",
+    "publish:dry-run": "npm pack",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
- },
+    "format": "prettier --write src/**/*.ts",
+    "docs:build": "echo 'Documentation available in docs/ directory. Use npm run docs:serve to view.'",
+    "docs:serve": "npx docsify-cli serve docs",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": [
     "entropy",
     "randomness",
     "blockchain",
     "typescript",
-    "sdk"
+    "sdk",
+    "cryptography",
+    "secure",
+    "decentralized",
+    "dapp",
+    "web3"
   ],
-  "author": "Project Entropy",
+ "author": {
+    "name": "Alea Team",
+    "email": "dev@alea.network",
+    "url": "https://alea.network"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/akindo/linera/tree/main/alea#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akindo/linera.git",
+    "directory": "alea/entropy-client-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/akindo/linera/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
+    "docsify-cli": "^4.4.4",
     "eslint": "^8.38.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^4.2.1",
@@ -39,6 +67,7 @@
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ]
 }

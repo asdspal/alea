@@ -1,0 +1,35 @@
+{
+  "name": "alea-demo",
+  "version": "1.0.0",
+  "description": "Provably Fair Slot Machine Demo for Alea Entropy",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "echo \"No tests specified for demo\" && exit 0"
+  },
+  "keywords": [
+    "entropy",
+    "randomness",
+    "blockchain",
+    "alea",
+    "demo",
+    "slot-machine",
+    "fair-gaming"
+  ],
+  "author": "Alea Team",
+  "license": "MIT",
+  "dependencies": {
+    "@alea/entropy-client-sdk": "file:../entropy-client-sdk/alea-entropy-client-sdk-0.1.0.tgz",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  }
+}
