@@ -135,7 +135,7 @@ describe('Full Flow End-to-End Tests', () => {
     const callbackReceived = new Promise((resolve) => {
       // In a real test, we would set up an actual server to receive the callback
       // For this test, we'll just verify the aggregator can handle callback requests
-      setTimeout(() => resolve(true), 1000);
+      setTimeout(1000).then(() => resolve(true));
     });
 
     const response = await axios.post(`${AGGREGATOR_URL}/request`, {

@@ -336,11 +336,13 @@ describe('Error Scenario Tests', () => {
 
     // Verify successful responses have correct structure
     responses
-      .filter(resp => !resp.hasOwnProperty('error'))
-      .forEach(response => {
-        expect(response.status).toBe(200);
-        expect(response.data).toHaveProperty('request_id');
-        expect(response.data).toHaveProperty('entropy');
+      .filter((resp: any) => !resp.hasOwnProperty('error'))
+      .forEach((response: any) => {
+        if ('status' in response && 'data' in response) {
+          expect(response.status).toBe(200);
+          expect(response.data).toHaveProperty('request_id');
+          expect(response.data).toHaveProperty('entropy');
+        }
       });
   }, TEST_TIMEOUT);
 

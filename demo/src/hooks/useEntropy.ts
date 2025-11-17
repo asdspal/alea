@@ -59,7 +59,19 @@ class MockLineraProvider implements LineraProvider {
 }
 
 export const useEntropy = () => {
-   const [entropyResult, setEntropyResult] = useState<RandomnessResult | null>(null);
+   // Define a type that matches what the UI expects
+   interface FormattedRandomnessResult {
+     roundId: number;
+     randomNumber: string;
+     attestation: {
+       report: string;
+       signature: string;
+       signingCert: string;
+       teeType: string;
+     };
+   }
+   
+   const [entropyResult, setEntropyResult] = useState<FormattedRandomnessResult | RandomnessResult | null>(null);
    const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,8 +89,20 @@ export const useEntropy = () => {
 
      try {
        // Request randomness from the entropy beacon
-       const requestId = await entropyClient.requestRandomness((result: RandomnessResult) => {
-         setEntropyResult(result);
+       const requestId = await entropyClient.requestRandomness((rawResult: RandomnessResult) => {
+         // Format the result to match what the UI expects
+         // Note: rawResult.attestation is a string, but UI expects an object with report, signature, etc.
+         const formattedResult = {
+           roundId: rawResult.roundId,
+           randomNumber: rawResult.randomNumber,
+           attestation: {
+             report: rawResult.attestation || '', // Using the attestation field as the report
+             signature: '', // Placeholder - in real implementation would extract from full attestation
+             signingCert: '', // Placeholder - in real implementation would extract from full attestation
+             teeType: 'SGX' // Placeholder - in real implementation would extract from attestation
+           }
+         };
+         setEntropyResult(formattedResult);
          setIsLoading(false);
        });
        
