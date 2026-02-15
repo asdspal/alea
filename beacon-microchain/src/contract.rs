@@ -1,6 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 mod state;
+mod utils;
 
 use beacon_microchain::{
     abi::{BeaconInstantiationArgument, BeaconMessage, BeaconOperation, BeaconParameters},
@@ -14,9 +15,12 @@ use self::state::BeaconState;
 
 contract!(BeaconContract);
 
+const MAX_RANDOM_HEX: usize = 64; // 32 bytes hex
+const MAX_NONCE_HEX: usize = 32;  // 16 bytes hex
+const MAX_ATTEST: usize = 4096;   // generous cap to avoid oversized payloads
+
 pub struct BeaconContract {
     state: BeaconState,
-    runtime: ContractRuntime<Self>,
 }
 
 impl WithContractAbi for BeaconContract {
@@ -33,7 +37,7 @@ impl Contract for BeaconContract {
         let state = BeaconState::load(runtime.root_view_storage_context())
             .await
             .expect("load state");
-        Self { state, runtime }
+        Self { state }
     }
 
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
@@ -64,14 +68,30 @@ impl Contract for BeaconContract {
 impl BeaconContract {
     async fn handle_submission(&mut self, event: RandomnessEvent, _signature: Vec<u8>) {
         // TODO: verify signature once format is defined; for now accept
+        if event.random_number.len() > MAX_RANDOM_HEX
+            || event.nonce.len() > MAX_NONCE_HEX
+            || event.attestation.len() > MAX_ATTEST
+        {
+            // Reject oversized payloads to keep storage bounded
+            return;
+        }
+
         let round_id = event.round_id;
         if round_id > *self.state.current_round_id.get() {
             self.state.current_round_id.set(round_id);
         }
         self.state
-            .events
-            .insert(&round_id, event)
-            .expect("insert event");
+            .event_random
+            .insert(&round_id, event.random_number)
+            .expect("insert random");
+        self.state
+            .event_nonce
+            .insert(&round_id, event.nonce)
+            .expect("insert nonce");
+        self.state
+            .event_attestation
+            .insert(&round_id, event.attestation)
+            .expect("insert attestation");
     }
 
     /// Test helper: pure BTreeMap version mirroring contract logic.

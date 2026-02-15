@@ -1,6 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 mod state;
+mod utils;
 
 use beacon_microchain::{
     abi::{BeaconParameters, BeaconQuery, BeaconQueryResponse},
