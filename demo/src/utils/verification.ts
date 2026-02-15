@@ -9,7 +9,7 @@
  * @returns Promise<boolean> - True if attestation is valid, false otherwise
  */
 export const verifyAttestation = async (
-  attestation: any // Using any type since we're working with the actual attestation report structure
+  attestation: any // SDK returns attestation as a string, but we'll handle both string and object formats
 ): Promise<boolean> => {
   try {
     // In a real implementation, this would perform cryptographic verification
@@ -18,9 +18,20 @@ export const verifyAttestation = async (
     
     console.log('Verifying attestation:', attestation);
     
-    // Check that required fields are present
-    if (!attestation.report || !attestation.signature || !attestation.signingCert) {
-      console.error('Attestation missing required fields');
+    // Handle both string and object attestation formats
+    if (typeof attestation === 'string') {
+      // String attestation - for demo purposes, assume it's valid if not empty
+      return attestation.length > 0;
+    }
+    
+    if (typeof attestation === 'object' && attestation !== null) {
+      // Object attestation - check that required fields are present
+      if (!attestation.report || !attestation.signature || !attestation.signingCert) {
+        console.error('Attestation missing required fields');
+        return false;
+      }
+    } else {
+      console.error('Invalid attestation format');
       return false;
     }
     
@@ -35,7 +46,7 @@ export const verifyAttestation = async (
   } catch (error) {
     console.error('Error verifying attestation:', error);
     return false;
- }
+  }
 };
 
 /**
@@ -73,13 +84,31 @@ export const verifyEntropyCommitment = (
  * @returns Object containing attestation details
  */
 export const analyzeAttestation = (attestation: any) => {
+  // Handle both string and object attestation formats
+  if (typeof attestation === 'string') {
+    return {
+      teeType: 'TEE',
+      attestationLength: attestation.length,
+      attestationPreview: attestation.substring(0, 50) + '...',
+      format: 'string'
+    };
+  }
+  
+  if (typeof attestation === 'object' && attestation !== null) {
+    return {
+      teeType: attestation.teeType || 'Unknown',
+      reportLength: attestation.report?.length || 0,
+      signatureLength: attestation.signature?.length || 0,
+      certLength: attestation.signingCert?.length || 0,
+      format: 'object'
+      // In a real implementation, we would extract more detailed information
+      // from the attestation report such as measurement values, enclave identity, etc.
+    };
+  }
+  
   return {
-    teeType: attestation.teeType,
-    reportLength: attestation.report?.length || 0,
-    signatureLength: attestation.signature?.length || 0,
-    certLength: attestation.signingCert?.length || 0,
-    // In a real implementation, we would extract more detailed information
-    // from the attestation report such as measurement values, enclave identity, etc.
+    teeType: 'Invalid',
+    format: 'unknown'
   };
 };
 

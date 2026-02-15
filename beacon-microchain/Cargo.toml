@@ -5,11 +5,13 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
 
 [dependencies]
 serde = { workspace = true }
-linera-sdk = { version = "0.14.0" }
-linera-base = { version = "0.14.0" }
+# Align with the installed CLI/runtime (testnet_conway build, v0.15.11)
+linera-sdk = { version = "0.15.11" }
+linera-base = { version = "0.15.11" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -17,3 +19,11 @@ bincode = "1.3"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
+
+[[bin]]
+name = "beacon_microchain_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "beacon_microchain_service"
+path = "src/service.rs"

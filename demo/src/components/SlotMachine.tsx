@@ -57,7 +57,7 @@ const SlotMachine: React.FC = () => {
         setResult(0); // Lose
       }
       
-      // Verify fairness of the result
+      // Verify fairness of the result - SDK returns attestation as a string
       verifyFairness(entropyResult.randomNumber, entropyResult.attestation, entropyResult.roundId)
         .then(fairnessResult => {
           setFairnessReport(fairnessResult);
@@ -94,7 +94,10 @@ const SlotMachine: React.FC = () => {
             <h3>Entropy Data</h3>
             <p><strong>Round ID:</strong> {entropyResult.roundId}</p>
             <p><strong>Random Number:</strong> {entropyResult.randomNumber}</p>
-            <p><strong>Attestation:</strong> {JSON.stringify(entropyResult.attestation)}</p>
+            <p><strong>Attestation:</strong> {typeof entropyResult.attestation === 'string'
+              ? `${entropyResult.attestation.substring(0, 50)}...`
+              : JSON.stringify(entropyResult.attestation)
+            }</p>
           </div>
         )}
         {fairnessReport && (

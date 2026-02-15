@@ -59,59 +59,37 @@ class MockLineraProvider implements LineraProvider {
 }
 
 export const useEntropy = () => {
-   // Define a type that matches what the UI expects
-   interface FormattedRandomnessResult {
-     roundId: number;
-     randomNumber: string;
-     attestation: {
-       report: string;
-       signature: string;
-       signingCert: string;
-       teeType: string;
-     };
-   }
-   
-   const [entropyResult, setEntropyResult] = useState<FormattedRandomnessResult | RandomnessResult | null>(null);
-   const [isLoading, setIsLoading] = useState(false);
+  // Use the actual RandomnessResult type from the SDK
+  const [entropyResult, setEntropyResult] = useState<RandomnessResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-   // Initialize the entropy client with a mock provider for demo purposes
-   const provider = new MockLineraProvider();
-   const entropyClient = new EntropyClientImpl({
-     beaconAddress: 'test-beacon-address',
-     provider: provider,
-     timeout: 30000,
-   });
+  // Initialize the entropy client with a mock provider for demo purposes
+  const provider = new MockLineraProvider();
+  const entropyClient = new EntropyClientImpl({
+    beaconAddress: 'test-beacon-address',
+    provider: provider,
+    timeout: 30000,
+  });
 
-   const requestEntropy = async () => {
-     setIsLoading(true);
-     setError(null);
+  const requestEntropy = async () => {
+    setIsLoading(true);
+    setError(null);
 
-     try {
-       // Request randomness from the entropy beacon
-       const requestId = await entropyClient.requestRandomness((rawResult: RandomnessResult) => {
-         // Format the result to match what the UI expects
-         // Note: rawResult.attestation is a string, but UI expects an object with report, signature, etc.
-         const formattedResult = {
-           roundId: rawResult.roundId,
-           randomNumber: rawResult.randomNumber,
-           attestation: {
-             report: rawResult.attestation || '', // Using the attestation field as the report
-             signature: '', // Placeholder - in real implementation would extract from full attestation
-             signingCert: '', // Placeholder - in real implementation would extract from full attestation
-             teeType: 'SGX' // Placeholder - in real implementation would extract from attestation
-           }
-         };
-         setEntropyResult(formattedResult);
-         setIsLoading(false);
-       });
-       
-       console.log('Randomness request submitted with ID:', requestId);
-     } catch (err) {
-       setError(err instanceof Error ? err.message : 'Unknown error occurred');
-       setIsLoading(false);
-     }
-   };
+    try {
+      // Request randomness from the entropy beacon
+      const requestId = await entropyClient.requestRandomness((rawResult: RandomnessResult) => {
+        // Set the result directly - no need to format since SDK returns what we need
+        setEntropyResult(rawResult);
+        setIsLoading(false);
+      });
+      
+      console.log('Randomness request submitted with ID:', requestId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setIsLoading(false);
+    }
+  };
 
    // Initialize the entropy client
    useEffect(() => {

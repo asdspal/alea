@@ -1,4 +1,7 @@
-use beacon_microchain::{BeaconContract, BeaconOperation, BeaconQuery, BeaconQueryResponse, RandomnessEvent};
+use beacon_microchain::{
+    abi::{BeaconOperation, BeaconQuery, BeaconQueryResponse},
+    get_randomness, process_randomness_submission, RandomnessEvent,
+};
 use std::collections::BTreeMap;
 
 #[cfg(test)]
@@ -10,10 +13,10 @@ mod tests {
     async fn test_beacon_integration_with_linera() {
         // This test would require a running Linera testnet to work properly
         // For now, we'll implement a mock version that demonstrates the concept
-        
+
         // In a real scenario, this would connect to a Linera testnet
         // For this test, we'll simulate the basic functionality
-        
+
         let mut current_round_id = 0;
         let mut events = BTreeMap::new();
         let admin_public_key = Some("test_admin_key".to_string());
@@ -28,7 +31,7 @@ mod tests {
         };
 
         // Process the randomness submission
-        let result = BeaconContract::process_randomness_submission(
+        let result = process_randomness_submission(
             event.clone(),
             vec![1, 2, 3], // signature
             &admin_public_key,
@@ -43,7 +46,7 @@ mod tests {
         assert_eq!(events.get(&1).unwrap().round_id, 1);
 
         // Query the randomness
-        let stored_event = BeaconContract::get_randomness(1, &events);
+        let stored_event = get_randomness(1, &events);
         assert!(stored_event.is_some());
         assert_eq!(stored_event.unwrap().round_id, 1);
 
@@ -66,7 +69,7 @@ mod tests {
                 attestation: vec![(i + 20) as u8],
             };
 
-            let result = BeaconContract::process_randomness_submission(
+            let result = process_randomness_submission(
                 event.clone(),
                 vec![1, 2, 3], // signature
                 &admin_public_key,
@@ -82,7 +85,7 @@ mod tests {
 
         // Verify all events are stored
         for i in 1..=5 {
-            let stored_event = BeaconContract::get_randomness(i, &events);
+            let stored_event = get_randomness(i, &events);
             assert!(stored_event.is_some());
             assert_eq!(stored_event.unwrap().round_id, i);
         }
@@ -105,7 +108,7 @@ mod tests {
         };
 
         // Attempt to submit with unauthorized caller
-        let result = BeaconContract::process_randomness_submission(
+        let result = process_randomness_submission(
             event,
             vec![1, 2, 3], // signature
             &admin_public_key,
@@ -137,7 +140,7 @@ mod tests {
             attestation: vec![3u8, 4u8, 5u8],
         };
 
-        let result = BeaconContract::process_randomness_submission(
+        let result = process_randomness_submission(
             event.clone(),
             vec![1, 2, 3], // signature
             &admin_public_key,
@@ -149,13 +152,15 @@ mod tests {
         assert!(result.is_ok());
 
         // Test query operations
-        match BeaconQuery::GetRandomness { round_id: 1 } {
+        match (BeaconQuery::GetRandomness { round_id: 1 }) {
             BeaconQuery::GetRandomness { round_id } => {
-                let response = BeaconContract::get_randomness(round_id, &events);
+                let response = get_randomness(round_id, &events);
                 match response {
                     Some(stored_event) => {
                         assert_eq!(stored_event.round_id, 1);
-                        println!("Query operation test passed: Correctly retrieved randomness event");
+                        println!(
+                            "Query operation test passed: Correctly retrieved randomness event"
+                        );
                     }
                     None => panic!("Expected to find randomness event"),
                 }
@@ -163,9 +168,9 @@ mod tests {
         }
 
         // Test query for non-existent event
-        match BeaconQuery::GetRandomness { round_id: 999 } {
+        match (BeaconQuery::GetRandomness { round_id: 999 }) {
             BeaconQuery::GetRandomness { round_id } => {
-                let response = BeaconContract::get_randomness(round_id, &events);
+                let response = get_randomness(round_id, &events);
                 assert!(response.is_none());
                 println!("Non-existent query test passed: Correctly returned None for non-existent event");
             }
@@ -179,7 +184,12 @@ mod tests {
 #[cfg(feature = "integration")]
 mod linera_integration_tests {
     use super::*;
-    use linera_sdk::{base::{ChainId, Amount}, contract::system_api, views::View, QueryContext};
+    use linera_sdk::{
+        base::{Amount, ChainId},
+        contract::system_api,
+        views::View,
+        QueryContext,
+    };
     use serde_json::json;
 
     // This would be the actual integration test that runs against a Linera testnet
@@ -187,7 +197,7 @@ mod linera_integration_tests {
         // This would connect to a real Linera testnet
         // The actual implementation would use Linera SDK functions to interact with the chain
         println!("Running real Linera integration test...");
-        
+
         // Example of how we would submit a randomness event to the chain
         // let randomness_event = RandomnessEvent {
         //     round_id: 1,
@@ -195,20 +205,20 @@ mod linera_integration_tests {
         //     nonce: [2u8; 16],
         //     attestation: vec![3u8, 4u8, 5u8],
         // };
-        // 
+        //
         // // Submit the event using Linera SDK
         // let operation = BeaconOperation::SubmitRandomness {
         //     event: randomness_event,
         //     signature: vec![1, 2, 3],
         // };
-        // 
+        //
         // // Execute the operation on the chain
         // // This would involve creating a transaction and submitting it to the chain
-        // 
+        //
         // // Query the chain to verify the event was stored
         // let query = BeaconQuery::GetRandomness { round_id: 1 };
         // let response: BeaconQueryResponse = /* query the chain */;
-        // 
+        //
         // match response {
         //     BeaconQueryResponse::GetRandomness(Some(event)) => {
         //         assert_eq!(event.round_id, 1);
